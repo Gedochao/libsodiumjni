@@ -12,10 +12,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest, macos-15-intel]
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest, macos-15-intel]
         include:
           - os: ubuntu-latest
             platform: linux
+          - os: ubuntu-24.04-arm
+            platform: linux-aarch64
           - os: windows-latest
             platform: windows
           - os: macos-latest
@@ -72,6 +74,10 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: artifacts-linux
+          path: artifacts/
+      - uses: actions/download-artifact@v8
+        with:
+          name: artifacts-linux-aarch64
           path: artifacts/
       - uses: actions/download-artifact@v8
         with:

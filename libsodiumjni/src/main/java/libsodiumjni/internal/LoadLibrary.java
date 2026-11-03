@@ -20,10 +20,26 @@ public final class LoadLibrary {
     }
 
     public static String resourcePath() {
-        Boolean isArmArch = System.getProperty("os.arch").toLowerCase(Locale.ROOT).contains("aarch64");
+        return resourcePath(System.getProperty("os.name"), System.getProperty("os.arch"));
+    }
 
-        String osName = System.getProperty("os.name").toLowerCase(Locale.ROOT);
-        if (osName.contains("linux")) return "META-INF/native/linux64/libsodiumjni.so";
+    /** Resource path of the native library for the passed OS name and architecture (as in the "os.name" and "os.arch" Java properties) */
+    public static String resourcePath(String osName0, String osArch0) {
+        String osArch = osArch0.toLowerCase(Locale.ROOT);
+        boolean isArmArch = osArch.contains("aarch64");
+
+        String osName = osName0.toLowerCase(Locale.ROOT);
+        if (osName.contains("linux")) {
+            switch (osArch) {
+                case "amd64":
+                case "x86_64":
+                    return "META-INF/native/linux64/libsodiumjni.so";
+                case "aarch64":
+                    return "META-INF/native/linux-aarch64/libsodiumjni.so";
+                default:
+                    throw new RuntimeException("Unsupported architecture on Linux: " + osArch0);
+            }
+        }
         else if (osName.contains("mac") && isArmArch) return "META-INF/native/arm-darwin/libsodiumjni.dylib";
         else if (osName.contains("mac")) return "META-INF/native/darwin/libsodiumjni.dylib";
         else if (osName.contains("windows")) return "META-INF/native/windows64/libsodiumjni.dll";
