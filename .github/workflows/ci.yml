@@ -72,19 +72,19 @@ jobs:
       - name: Install libsodium (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get install -y libsodium-dev
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: artifacts-linux
           path: artifacts/
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: artifacts-windows
           path: artifacts/
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: artifacts-mac-intel
           path: artifacts/
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: artifacts-mac-aarch64
           path: artifacts/
