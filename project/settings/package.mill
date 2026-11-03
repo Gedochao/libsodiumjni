@@ -2,7 +2,7 @@ package build.project.settings
 
 import java.util.Arrays
 import build.project.visualstudioutil.vcvars
-import build.project.utils.{toCrLfOpt, isArmArchitecture}
+import build.project.utils.{isArmArchitecture, linuxArch, nativeResourceDir, toCrLfOpt}
 import mill.*
 import mill.api.BuildCtx
 import mill.javalib.*
@@ -66,14 +66,17 @@ trait JniUploadDownloadArtifacts extends JniWindowsModule with JniUnixPublish:
       Task {
         unixLibName()
       }
-  def jniClassifier = Task {
-    if Properties.isWin then "x86_64-pc-win32"
-    else if Properties.isLinux then "x86_64-pc-linux"
-    else if Properties.isMac then
-      if isArmArchitecture then "aarch64-apple-darwin"
-      else "x86_64-apple-darwin"
-    else sys.error("Unrecognized OS")
-  }
+  // The if must be outside of Task { … }: Mill evaluates all upstream tasks referenced in a task
+  // body, whichever branch runs, and osClassifier fails on Windows
+  def jniClassifier =
+    if Properties.isWin then
+      Task {
+        "x86_64-pc-win32"
+      }
+    else
+      Task {
+        osClassifier()
+      }
 
   def jniCopyFilesTo(dest: String = "artifacts/") = Task.Command {
     val toCopy0      = jniFilesToCopy()
@@ -117,13 +120,8 @@ trait JniResourcesModule extends JniUploadDownloadArtifacts with JniWindowsAddRe
     val destDir      = Task.dest / "resources"
     val libraryName0 = jniLibraryName()
     for (f, classifier, ext) <- jniArtifactDirFiles() do
-      val osName = classifier match
-        case "x86_64-apple-darwin"  => "darwin"
-        case "aarch64-apple-darwin" => "arm-darwin"
-        case "x86_64-pc-linux"      => "linux64"
-        case "x86_64-pc-win32"      => "windows64"
-        case other                  => sys.error(s"Unrecognized classifier: $other")
-      val dest = destDir / "META-INF" / "native" / osName / s"$libraryName0.$ext"
+      val dest =
+        destDir / "META-INF" / "native" / nativeResourceDir(classifier) / s"$libraryName0.$ext"
       os.copy.over(f.path, dest, createFolders = true)
     PathRef(destDir)
   }
@@ -369,6 +367,15 @@ trait JniUnixModule extends Module:
     // Seems required with Java 8
     if dir.getName == "jre" then dir.getParent
     else value
+  }
+
+  /** Classifier of the native libraries built on this machine */
+  def osClassifier = Task {
+    if Properties.isMac then
+      if isArmArchitecture then "aarch64-apple-darwin"
+      else "x86_64-apple-darwin"
+    else if Properties.isLinux then s"$linuxArch-pc-linux"
+    else sys.error("Unrecognized OS")
   }
 
   def osDirName = Task {
@@ -665,12 +672,7 @@ trait JniUnixAddResources extends JavaModule with JniUnixModule:
   def unixResources = Task {
     val dll0   = unixSo().path
     val dir    = Task.dest / "so-resources"
-    // Must match the layout expected by libsodiumjni.internal.LoadLibrary.resourcePath()
-    val osName = osDirName() match
-      case "linux"                       => "linux64"
-      case "darwin" if isArmArchitecture => "arm-darwin"
-      case other                         => other
-    val dllDir      = dir / "META-INF" / "native" / osName
+    val dllDir      = dir / "META-INF" / "native" / nativeResourceDir(osClassifier())
     val dest        = dllDir / dll0.last
     val needsUpdate = !os.isFile(dest) || {
       val content    = os.read.bytes(dest)
@@ -690,13 +692,6 @@ trait JniUnixAddResources extends JavaModule with JniUnixModule:
       super.resources
 
 trait JniUnixPublish extends JniUnixModule:
-  def osClassifier = Task {
-    if Properties.isMac then
-      if isArmArchitecture then "aarch64-apple-darwin"
-      else "x86_64-apple-darwin"
-    else if Properties.isLinux then "x86_64-pc-linux"
-    else sys.error("Unrecognized OS")
-  }
   def unixExtraPublish = Task {
     Seq(
       PublishInfo(

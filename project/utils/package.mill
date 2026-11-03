@@ -2,6 +2,8 @@ package build.project.utils
 
 import mill.api.BuildCtx
 
+import java.util.Locale
+
 def toCrLfOpt(content: Array[Byte]): Option[Array[Byte]] =
   val cr      = '\r'.toByte
   val lf      = '\n'.toByte
@@ -43,3 +45,24 @@ def toCrLfOpt(content: Array[Byte]): Option[Array[Byte]] =
     Some(updatedContent)
 def isArmArchitecture: Boolean =
   os.proc("uname", "-p").call(cwd = BuildCtx.workspaceRoot).out.trim() == "arm"
+
+/** CPU architecture of the Linux build machine, as "x86_64" or "aarch64" */
+def linuxArch: String =
+  sys.props("os.arch").toLowerCase(Locale.ROOT) match
+    case "amd64" | "x86_64"  => "x86_64"
+    case "aarch64" | "arm64" => "aarch64"
+    case other               => sys.error(s"Unsupported architecture on Linux: $other")
+
+/**
+ * Directory, under META-INF/native in the JAR, of the native library with the passed classifier.
+ *
+ * Must match libsodiumjni.internal.LoadLibrary.resourcePath().
+ */
+def nativeResourceDir(classifier: String): String =
+  classifier match
+    case "x86_64-apple-darwin"  => "darwin"
+    case "aarch64-apple-darwin" => "arm-darwin"
+    case "x86_64-pc-linux"      => "linux64"
+    case "aarch64-pc-linux"     => "linux-aarch64"
+    case "x86_64-pc-win32"      => "windows64"
+    case other                  => sys.error(s"Unrecognized classifier: $other")

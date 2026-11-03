@@ -186,11 +186,12 @@ object libsodiumjni extends MavenModule with JniModule with JniPublishModule wit
       )
     else
       Seq(
-        "/opt/homebrew/lib",         // macOS Homebrew (Apple Silicon)
-        "/usr/local/lib",            // macOS/Linux local install
-        "/usr/lib/x86_64-linux-gnu", // Ubuntu/Debian 64-bit
-        "/usr/lib64",                // Some Linux distributions
-        "/usr/lib"                   // Standard Linux path
+        "/opt/homebrew/lib",          // macOS Homebrew (Apple Silicon)
+        "/usr/local/lib",             // macOS/Linux local install
+        "/usr/lib/x86_64-linux-gnu",  // Ubuntu/Debian x86_64
+        "/usr/lib/aarch64-linux-gnu", // Ubuntu/Debian arm64
+        "/usr/lib64",                 // Some Linux distributions
+        "/usr/lib"                    // Standard Linux path
       )
     commonPaths.find { path =>
       val libPath = os.Path(path)
