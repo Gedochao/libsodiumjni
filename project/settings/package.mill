@@ -206,7 +206,7 @@ trait JniWindowsModule extends Module:
              |if %errorlevel% neq 0 exit /b %errorlevel%
              |$windowsBatInit
              |cl /I $q${javaHome0 / "include"}$q /I $q${javaHome0 / "include" /
-              "win32"}$q /utf-8 $userOptions /c $q$f$q
+              "win32"}$q /utf-8 /O2 /W4 $userOptions /c $q$f$q
              |""".stripMargin
         val scriptPath = dest / "run-cl.bat"
         os.write.over(scriptPath, script.getBytes, createFolders = true)
@@ -413,8 +413,16 @@ trait JniUnixModule extends Module:
       val relOutput = output.relativeTo(BuildCtx.workspaceRoot)
       val command   = gcc0 ++ Seq(
         "-c",
+        "-O2",
         "-Wall",
+        "-Wextra",
+        "-Werror",
         "-fPIC",
+        // explicit, rather than relying on the toolchain defaults
+        "-fstack-protector-strong",
+        // -U first, as some toolchains define it already (warning, so error with -Werror)
+        "-U_FORTIFY_SOURCE",
+        "-D_FORTIFY_SOURCE=2",
         s"-I$javaHome0/include",
         s"-I$javaHome0/include/$osDirName0"
       ) ++ extraOpts ++ Seq(path, "-o", relOutput.toString)

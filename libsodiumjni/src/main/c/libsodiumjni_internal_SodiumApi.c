@@ -15,6 +15,14 @@ extern "C" {
  * case the JVM throws that exception and ignores the returned value. */
 #define LIBSODIUMJNI_EXCEPTION_THROWN -11
 
+/* libsodium's sizes, as jsize (signed, like the Java array lengths they're compared to) */
+#define PUBLIC_KEY_BYTES ((jsize) crypto_box_PUBLICKEYBYTES)
+#define SECRET_KEY_BYTES ((jsize) crypto_box_SECRETKEYBYTES)
+#define SEAL_BYTES ((jsize) crypto_box_SEALBYTES)
+
+/* for the parameters every JNI function gets, but that some of them don't use */
+#define UNUSED(x) (void) (x)
+
 /*
  * Array contents are copied with Get/SetByteArrayRegion, from / to buffers allocated here, rather
  * than accessed via GetByteArrayElements: the latter can return NULL (when the JVM can't allocate a
@@ -62,22 +70,29 @@ static void free_wiped(unsigned char *buf, size_t len) {
 
 JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_sodium_1init
   (JNIEnv *env, jclass cls) {
+    UNUSED(env);
+    UNUSED(cls);
     return sodium_init();
 }
 
 
 JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1public_1key_1bytes
   (JNIEnv *env, jclass cls) {
-    return crypto_box_PUBLICKEYBYTES;
+    UNUSED(env);
+    UNUSED(cls);
+    return PUBLIC_KEY_BYTES;
 }
 
 JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1secret_1key_1bytes
   (JNIEnv *env, jclass cls) {
-    return crypto_box_SECRETKEYBYTES;
+    UNUSED(env);
+    UNUSED(cls);
+    return SECRET_KEY_BYTES;
 }
 
 JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1keypair
   (JNIEnv *env, jclass cls, jbyteArray pub_key, jbyteArray secret_key) {
+    UNUSED(cls);
 
     if (is_null(env, pub_key, "public key is null") ||
         is_null(env, secret_key, "secret key is null"))
@@ -86,7 +101,7 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1keypair
     jsize provided_pub_key_len = (*env)->GetArrayLength(env, pub_key);
     jsize provided_sec_key_len = (*env)->GetArrayLength(env, secret_key);
 
-    if (provided_pub_key_len < crypto_box_PUBLICKEYBYTES || provided_sec_key_len < crypto_box_SECRETKEYBYTES)
+    if (provided_pub_key_len < PUBLIC_KEY_BYTES || provided_sec_key_len < SECRET_KEY_BYTES)
         return LIBSODIUMJNI_INVALID_ARGUMENTS;
 
     unsigned char recipient_pk[crypto_box_PUBLICKEYBYTES];
@@ -95,8 +110,8 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1keypair
     int res = crypto_box_keypair(recipient_pk, recipient_sk);
 
     if (res == 0) {
-        (*env)->SetByteArrayRegion(env, pub_key, 0, crypto_box_PUBLICKEYBYTES, (const jbyte *) recipient_pk);
-        (*env)->SetByteArrayRegion(env, secret_key, 0, crypto_box_SECRETKEYBYTES, (const jbyte *) recipient_sk);
+        (*env)->SetByteArrayRegion(env, pub_key, 0, PUBLIC_KEY_BYTES, (const jbyte *) recipient_pk);
+        (*env)->SetByteArrayRegion(env, secret_key, 0, SECRET_KEY_BYTES, (const jbyte *) recipient_sk);
     }
 
     wipe(recipient_sk, sizeof recipient_sk);
@@ -105,11 +120,14 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1keypair
 
 JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal_1bytes
   (JNIEnv *env, jclass cls) {
-    return crypto_box_SEALBYTES;
+    UNUSED(env);
+    UNUSED(cls);
+    return SEAL_BYTES;
 }
 
 JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal
   (JNIEnv *env, jclass cls, jbyteArray cipher, jbyteArray msg, jbyteArray pub_key) {
+    UNUSED(cls);
 
     if (is_null(env, cipher, "cipher is null") ||
         is_null(env, msg, "message is null") ||
@@ -120,14 +138,14 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal
     jsize msg_len = (*env)->GetArrayLength(env, msg);
     jsize pub_key_len = (*env)->GetArrayLength(env, pub_key);
 
-    /* computed on 64 bits, as crypto_box_SEALBYTES + msg_len can exceed the jsize range */
-    long long sealed_len = (long long) crypto_box_SEALBYTES + msg_len;
+    /* computed on 64 bits, as SEAL_BYTES + msg_len can exceed the jsize range */
+    long long sealed_len = (long long) SEAL_BYTES + msg_len;
 
-    if (pub_key_len != crypto_box_PUBLICKEYBYTES || cipher_len < sealed_len)
+    if (pub_key_len != PUBLIC_KEY_BYTES || cipher_len < sealed_len)
         return LIBSODIUMJNI_INVALID_ARGUMENTS;
 
     unsigned char pub_key_bytes[crypto_box_PUBLICKEYBYTES];
-    (*env)->GetByteArrayRegion(env, pub_key, 0, crypto_box_PUBLICKEYBYTES, (jbyte *) pub_key_bytes);
+    (*env)->GetByteArrayRegion(env, pub_key, 0, PUBLIC_KEY_BYTES, (jbyte *) pub_key_bytes);
 
     unsigned char *msg_bytes = checked_malloc(env, (size_t) msg_len);
     if (msg_bytes == NULL)
@@ -154,6 +172,7 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal
 
 JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal_1open
   (JNIEnv *env, jclass cls, jbyteArray decrypted, jbyteArray cipher, jbyteArray pub_key, jbyteArray secret_key) {
+    UNUSED(cls);
 
     if (is_null(env, decrypted, "decrypted is null") ||
         is_null(env, cipher, "cipher is null") ||
@@ -166,17 +185,17 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal_1o
     jsize pub_key_len = (*env)->GetArrayLength(env, pub_key);
     jsize sec_key_len = (*env)->GetArrayLength(env, secret_key);
 
-    /* crypto_box_seal_open writes exactly cipher_len - crypto_box_SEALBYTES bytes */
-    if (cipher_len < crypto_box_SEALBYTES ||
-        msg_len != cipher_len - crypto_box_SEALBYTES ||
-        pub_key_len != crypto_box_PUBLICKEYBYTES ||
-        sec_key_len != crypto_box_SECRETKEYBYTES)
+    /* crypto_box_seal_open writes exactly cipher_len - SEAL_BYTES bytes */
+    if (cipher_len < SEAL_BYTES ||
+        msg_len != cipher_len - SEAL_BYTES ||
+        pub_key_len != PUBLIC_KEY_BYTES ||
+        sec_key_len != SECRET_KEY_BYTES)
         return LIBSODIUMJNI_INVALID_ARGUMENTS;
 
     unsigned char pub_key_bytes[crypto_box_PUBLICKEYBYTES];
     unsigned char sec_key_bytes[crypto_box_SECRETKEYBYTES];
-    (*env)->GetByteArrayRegion(env, pub_key, 0, crypto_box_PUBLICKEYBYTES, (jbyte *) pub_key_bytes);
-    (*env)->GetByteArrayRegion(env, secret_key, 0, crypto_box_SECRETKEYBYTES, (jbyte *) sec_key_bytes);
+    (*env)->GetByteArrayRegion(env, pub_key, 0, PUBLIC_KEY_BYTES, (jbyte *) pub_key_bytes);
+    (*env)->GetByteArrayRegion(env, secret_key, 0, SECRET_KEY_BYTES, (jbyte *) sec_key_bytes);
 
     unsigned char *cipher_bytes = checked_malloc(env, (size_t) cipher_len);
     if (cipher_bytes == NULL) {
