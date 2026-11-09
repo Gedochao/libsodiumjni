@@ -1,5 +1,7 @@
 package libsodiumjni;
 
+import java.util.Objects;
+
 import libsodiumjni.internal.SodiumApi;
 
 public final class Sodium {
@@ -37,6 +39,8 @@ public final class Sodium {
     }
 
     public static byte[] seal(byte[] message, byte[] pubKey) {
+        Objects.requireNonNull(message, "message is null");
+        Objects.requireNonNull(pubKey, "public key is null");
         checkKeyLength("public key", pubKey, SodiumApi.crypto_box_public_key_bytes());
         byte[] cipher = new byte[SodiumApi.crypto_box_seal_bytes() + message.length];
         int res = SodiumApi.crypto_box_seal(cipher, message, message.length, pubKey);
@@ -47,6 +51,9 @@ public final class Sodium {
     }
 
     public static byte[] sealOpen(byte[] cipher, byte[] pubKey, byte[] secretKey) {
+        Objects.requireNonNull(cipher, "cipher is null");
+        Objects.requireNonNull(pubKey, "public key is null");
+        Objects.requireNonNull(secretKey, "secret key is null");
         checkKeyLength("public key", pubKey, SodiumApi.crypto_box_public_key_bytes());
         checkKeyLength("secret key", secretKey, SodiumApi.crypto_box_secret_key_bytes());
         if (cipher.length < SodiumApi.crypto_box_seal_bytes()) {
