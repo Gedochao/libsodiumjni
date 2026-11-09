@@ -368,12 +368,6 @@ trait JniUnixModule extends Module:
   /** Extra arguments passed as-is when linking the shared library (e.g. static archive paths) */
   def unixLinkingArgs = Task(Seq.empty[String])
 
-  // Helper method to check if a library path contains architecture-compatible libraries
-  // This can be overridden in build.mill to provide architecture checking
-  protected def checkLibraryArchitectureForPath(libPath: os.Path, requiredArch: String): Boolean =
-    // Default implementation: assume compatibility (can be overridden)
-    true
-
   def unixJavaHome = Task {
     import java.io.File
     val value = sys.props("java.home")
@@ -530,21 +524,7 @@ trait JniUnixModule extends Module:
     val dest     = destDir / s"$dllName0.$unixExtension0"
     val relDest  = dest.relativeTo(BuildCtx.workspaceRoot)
     val objsArgs = objs.map(o => o.path.relativeTo(BuildCtx.workspaceRoot).toString).distinct
-    // Extract architecture from extraOpts (e.g., "-arch", "x86_64" or "-arch", "arm64")
-    val archOpt = extraOpts.zipWithIndex.find(_._1 == "-arch").map(_._2 + 1).flatMap { idx =>
-      if idx < extraOpts.length then Some(extraOpts(idx)) else None
-    }
-    // Filter library paths based on architecture compatibility on macOS
-    val filteredLibPaths = if Properties.isMac && archOpt.isDefined then
-      val arch = archOpt.get
-      unixLinkingLibPaths.filter { libPath =>
-        val path = os.Path(libPath, BuildCtx.workspaceRoot)
-        // Check if library supports the required architecture
-        checkLibraryArchitectureForPath(path, arch)
-      }
-    else
-      unixLinkingLibPaths
-    val libPathsArgs = filteredLibPaths.map(l => "-L" + l)
+    val libPathsArgs = unixLinkingLibPaths.map(l => "-L" + l)
     val libsArgs     = unixLinkingLibs.map(l => "-l" + l)
     val command      =
       gcc0 ++ Seq("-shared") ++ extraOpts ++ Seq(

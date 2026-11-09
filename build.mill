@@ -122,121 +122,75 @@ object libsodiumjni extends MavenModule with JniModule with JniPublishModule wit
       )
     file
 
-  private def checkLibraryArchitecture(libPath: os.Path, requiredArch: String): Boolean =
-    if !Properties.isMac then return true // On Linux, assume compatibility
-    if !os.exists(libPath) then return false
+  // On macOS, libsodium is built from source (see macosLibSodium), so the following only look for
+  // the libsodium installed on Linux
 
-    // Check if library supports the required architecture using lipo or file
-    val dylibPath =
-      if libPath.last.endsWith(".dylib") then libPath
-      else libPath / "libsodium.dylib"
+  /** Output of pkg-config, if it's installed and succeeds */
+  private def pkgConfig(args: String*): Option[String] =
+    try
+      val res = os.proc("pkg-config" +: args).call(
+        cwd = BuildCtx.workspaceRoot,
+        check = false,
+        stderr = os.Pipe
+      )
+      if res.exitCode == 0 then Some(res.out.trim()) else None
+    catch
+      // pkg-config not installed
+      case _: java.io.IOException => None
 
-    if !os.exists(dylibPath) then return false
+  private def linuxLibSodiumLibDir(): Option[String] =
+    pkgConfig("--libs", "libsodium") match
+      case Some(output) =>
+        // Extract -L path from pkg-config output (e.g., "-L/usr/local/lib"). If pkg-config succeeds
+        // with no -L flag, the library is in a standard path, that the linker finds automatically.
+        output.split(" ").find(_.startsWith("-L")).map(_.drop(2))
+          .filter(p => os.exists(os.Path(p, BuildCtx.workspaceRoot)))
+      case None =>
+        linuxLibSodiumLibDirFallback()
 
-    // Use lipo to check architectures (macOS only)
-    val lipoResult = os.proc("lipo", "-info", dylibPath.toString).call(
-      cwd = BuildCtx.workspaceRoot,
-      check = false,
-      stderr = os.Pipe
+  // Common installation paths, when pkg-config isn't available
+  private def linuxLibSodiumLibDirFallback(): Option[String] =
+    val commonPaths = Seq(
+      "/usr/local/lib",             // local install
+      "/usr/lib/x86_64-linux-gnu",  // Ubuntu/Debian x86_64
+      "/usr/lib/aarch64-linux-gnu", // Ubuntu/Debian arm64
+      "/usr/lib64",                 // Some Linux distributions
+      "/usr/lib"                    // Standard Linux path
     )
-    if lipoResult.exitCode == 0 then
-      val output = lipoResult.out.trim()
-      // Check if it's a universal binary or contains the required architecture
-      output.contains(requiredArch) || output.contains("universal")
-    else
-      // Fallback: if lipo fails, assume it's compatible (might be a symlink or static lib)
-      true
-
-  private def unixLibSodiumLibDir(requiredArch: Option[String] = None): Option[String] =
-    // Try pkg-config first
-    val pkgConfigResult = os.proc("pkg-config", "--libs", "libsodium").call(
-      cwd = BuildCtx.workspaceRoot,
-      check = false,
-      stderr = os.Pipe
-    )
-    if pkgConfigResult.exitCode == 0 then
-      val output = pkgConfigResult.out.trim()
-      // Extract -L path from pkg-config output (e.g., "-L/opt/homebrew/lib")
-      val libPath = output.split(" ").find(_.startsWith("-L")).map(_.drop(2))
-      if libPath.isDefined then
-        val path = os.Path(libPath.get, BuildCtx.workspaceRoot)
-        if os.exists(path) then
-          // Check architecture compatibility if required
-          if requiredArch.isEmpty || checkLibraryArchitecture(path, requiredArch.get) then
-            return Some(libPath.get)
-      // If pkg-config succeeds but no -L flag, library is in standard path
-      // Return None to let the linker find it automatically
-      return None
-    // Fall back to common installation paths
-    // On macOS, prioritize based on architecture: x86_64 -> /usr/local first, arm64 -> /opt/homebrew first
-    val commonPaths = if Properties.isMac && requiredArch.contains("x86_64") then
-      Seq(
-        "/usr/local/lib",    // macOS Intel Homebrew (for x86_64 on Apple Silicon)
-        "/opt/homebrew/lib", // macOS Homebrew (Apple Silicon)
-        "/usr/lib"           // Standard macOS path
-      )
-    else if Properties.isMac && requiredArch.contains("arm64") then
-      Seq(
-        "/opt/homebrew/lib", // macOS Homebrew (Apple Silicon)
-        "/usr/local/lib",    // macOS Intel Homebrew
-        "/usr/lib"           // Standard macOS path
-      )
-    else
-      Seq(
-        "/opt/homebrew/lib",          // macOS Homebrew (Apple Silicon)
-        "/usr/local/lib",             // macOS/Linux local install
-        "/usr/lib/x86_64-linux-gnu",  // Ubuntu/Debian x86_64
-        "/usr/lib/aarch64-linux-gnu", // Ubuntu/Debian arm64
-        "/usr/lib64",                 // Some Linux distributions
-        "/usr/lib"                    // Standard Linux path
-      )
     commonPaths.find { path =>
       val libPath = os.Path(path)
-      // Check if libsodium exists in this directory
-      os.exists(libPath) && os.list(libPath).exists(_.last.startsWith("libsodium")) &&
-      // Check architecture compatibility if required
-      (requiredArch.isEmpty || checkLibraryArchitecture(libPath, requiredArch.get))
+      os.exists(libPath) && os.list(libPath).exists(_.last.startsWith("libsodium"))
     }
 
   def unixLinkingLibPaths = Task {
     // On macOS, libsodium is built from source and linked statically (see macosLibSodium)
-    val libDir = if Properties.isMac then None else unixLibSodiumLibDir()
+    val libDir = if Properties.isMac then None else linuxLibSodiumLibDir()
     // If libDir is None, library is in standard path and linker will find it automatically
     super.unixLinkingLibPaths() ++ libDir.toSeq
   }
 
-  private def unixLibSodiumIncludeDir(): String =
-    // Try pkg-config first
-    val pkgConfigResult = os.proc("pkg-config", "--cflags", "libsodium").call(
-      cwd = BuildCtx.workspaceRoot,
-      check = false,
-      stderr = os.Pipe
-    )
-    if pkgConfigResult.exitCode == 0 then
-      val output = pkgConfigResult.out.trim()
-      // Extract -I path from pkg-config output (e.g., "-I/opt/homebrew/include")
-      val includePath = output.split(" ").find(_.startsWith("-I")).map(_.drop(2))
-      if includePath.isDefined && os.exists(os.Path(includePath.get, BuildCtx.workspaceRoot)) then
-        return includePath.get
+  private def linuxLibSodiumIncludeDir(): String =
+    // Try pkg-config first (extracting the -I path from its output, e.g. "-I/usr/local/include")
+    val fromPkgConfig = pkgConfig("--cflags", "libsodium")
+      .flatMap(_.split(" ").find(_.startsWith("-I")).map(_.drop(2)))
+      .filter(p => os.exists(os.Path(p, BuildCtx.workspaceRoot)))
     // Fall back to common installation paths
     val commonPaths = Seq(
-      "/opt/homebrew/include", // macOS Homebrew (Apple Silicon)
-      "/usr/local/include",    // macOS/Linux local install
-      "/usr/include"           // Standard Linux path
+      "/usr/local/include", // local install
+      "/usr/include"        // Standard Linux path
     )
-    commonPaths.find(path => os.exists(os.Path(path) / "sodium.h")).getOrElse {
-      val osName     = if Properties.isMac then "macOS" else "Linux"
-      val installCmd =
-        if Properties.isMac then "brew install libsodium" else "sudo apt-get install libsodium-dev"
+    val fromCommonPaths = commonPaths.find(path => os.exists(os.Path(path) / "sodium.h"))
+    fromPkgConfig.orElse(fromCommonPaths).getOrElse {
       sys.error(
-        s"libsodium headers not found on $osName. Please install libsodium (e.g., '$installCmd')"
+        "libsodium headers not found. Please install libsodium (e.g., " +
+          "'sudo apt-get install libsodium-dev')"
       )
     }
 
   def extraUnixCOptions = Task {
     val includeDir = macosLibSodium() match
       case Some(libSodium) => (libSodium.path / "include").toString
-      case None            => unixLibSodiumIncludeDir()
+      case None            => linuxLibSodiumIncludeDir()
     Seq(s"-I$includeDir")
   }
 
