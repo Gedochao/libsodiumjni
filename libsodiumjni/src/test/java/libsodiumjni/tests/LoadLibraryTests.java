@@ -22,7 +22,7 @@ public class LoadLibraryTests {
     @Test
     public void linuxUnsupportedArchitectureFails() {
         // Loading the x86_64 library there can only fail, with a less helpful error
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> LoadLibrary.resourcePath("Linux", "ppc64le"));
+        UnsupportedOperationException ex = assertThrows(UnsupportedOperationException.class, () -> LoadLibrary.resourcePath("Linux", "ppc64le"));
         assertEquals("Unsupported architecture on Linux: ppc64le", ex.getMessage());
     }
 
@@ -35,7 +35,7 @@ public class LoadLibraryTests {
     @Test
     public void macOsUnsupportedArchitectureFails() {
         // Loading the x86_64 library there can only fail, with a less helpful error
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> LoadLibrary.resourcePath("Mac OS X", "ppc"));
+        UnsupportedOperationException ex = assertThrows(UnsupportedOperationException.class, () -> LoadLibrary.resourcePath("Mac OS X", "ppc"));
         assertEquals("Unsupported architecture on macOS: ppc", ex.getMessage());
     }
 
@@ -47,14 +47,14 @@ public class LoadLibraryTests {
     @Test
     public void windowsUnsupportedArchitecturesFail() {
         // e.g. a native arm64 JVM on Windows on ARM, which can't load the x86_64 DLL
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> LoadLibrary.resourcePath("Windows 11", "aarch64"));
+        UnsupportedOperationException ex = assertThrows(UnsupportedOperationException.class, () -> LoadLibrary.resourcePath("Windows 11", "aarch64"));
         assertEquals("Unsupported architecture on Windows: aarch64", ex.getMessage());
         // 32-bit JVM
-        assertThrows(RuntimeException.class, () -> LoadLibrary.resourcePath("Windows 10", "x86"));
+        assertThrows(UnsupportedOperationException.class, () -> LoadLibrary.resourcePath("Windows 10", "x86"));
     }
 
     @Test
     public void unsupportedOsFails() {
-        assertThrows(RuntimeException.class, () -> LoadLibrary.resourcePath("FreeBSD", "amd64"));
+        assertThrows(UnsupportedOperationException.class, () -> LoadLibrary.resourcePath("FreeBSD", "amd64"));
     }
 }

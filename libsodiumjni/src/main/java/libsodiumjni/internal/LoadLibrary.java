@@ -76,11 +76,11 @@ public final class LoadLibrary {
             dir = "x86_64".equals(arch) ? "windows64/libsodiumjni.dll" : null;
         }
         else
-          throw new RuntimeException("Unrecognized or unsupported OS: " + osName);
+          throw new UnsupportedOperationException("Unrecognized or unsupported OS: " + osName);
 
         // Rather than falling back to another architecture's library, which can only fail to load
         if (dir == null)
-            throw new RuntimeException("Unsupported architecture on " + os + ": " + osArch0);
+            throw new UnsupportedOperationException("Unsupported architecture on " + os + ": " + osArch0);
         return "META-INF/native/" + dir;
     }
 
@@ -90,7 +90,7 @@ public final class LoadLibrary {
         else if (osName.contains("mac")) return ".dylib";
         else if (osName.contains("windows")) return ".dll";
         else
-          throw new RuntimeException("Unrecognized or unsupported OS: " + osName);
+          throw new UnsupportedOperationException("Unrecognized or unsupported OS: " + osName);
     }
 
     private static boolean isWindows() {
@@ -125,7 +125,7 @@ public final class LoadLibrary {
                     ? ClassLoader.getSystemResource(resourcePath)
                     : LoadLibrary.class.getClassLoader().getResource(resourcePath);
         if (resUrl == null)
-            throw new RuntimeException("Resource " + resourcePath + " not found");
+            throw new IllegalStateException("Resource " + resourcePath + " not found");
         try (InputStream is = resUrl.openStream()) {
             return is.readAllBytes();
         }
@@ -202,7 +202,8 @@ public final class LoadLibrary {
                 hex.append(Character.forDigit((b >> 4) & 0xf, 16)).append(Character.forDigit(b & 0xf, 16));
             return hex.toString();
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
+            // can't happen, SHA-256 is required to be supported by all JVMs
+            throw new IllegalStateException(e);
         }
     }
 
