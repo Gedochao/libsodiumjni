@@ -240,6 +240,17 @@ object libsodiumjni extends MavenModule with JniModule with JniPublishModule wit
     Seq(s"-I$includeDir")
   }
 
+  // The C code includes the JNI header that compile generates (javac -h, see GenerateHeaders), so
+  // it must be compiled after it, rather than possibly against an outdated header
+  def unixCSources = Task {
+    compile()
+    super.unixCSources()
+  }
+  def windowsCSources = Task {
+    compile()
+    super.windowsCSources()
+  }
+
   def unixCOptions = Task {
     super.unixCOptions() ++ extraUnixCOptions() ++
       (if Properties.isMac then macosDeploymentTargetOptions else Nil)
