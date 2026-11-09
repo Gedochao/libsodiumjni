@@ -27,9 +27,19 @@ final class ChildJvm {
 
     static Result run(Class<?> mainClass, List<String> args, Map<String, String> env, Path workDir)
             throws IOException, InterruptedException {
+        return run(List.of(), mainClass, args, env, workDir);
+    }
+
+    static Result run(
+            List<String> jvmOptions,
+            Class<?> mainClass,
+            List<String> args,
+            Map<String, String> env,
+            Path workDir) throws IOException, InterruptedException {
         Path javaBin = Path.of(System.getProperty("java.home"), "bin", "java");
         List<String> command = new ArrayList<>();
         command.add(javaBin.toString());
+        command.addAll(jvmOptions);
         command.add("-cp");
         command.add(System.getProperty("java.class.path"));
         command.add(mainClass.getName());
