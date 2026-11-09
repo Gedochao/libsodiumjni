@@ -126,8 +126,10 @@ public class SodiumTests {
     @Test
     public void openTooShortCipherFails() {
         KeyPair keyPair = Sodium.keyPair();
-        assertThrows(
+        RuntimeException ex = assertThrows(
                 RuntimeException.class,
                 () -> Sodium.sealOpen(new byte[SEAL_BYTES - 1], keyPair.getPubKey(), keyPair.getSecKey()));
+        // SEAL_BYTES itself is accepted (empty message, see sealAndOpenEmptyMessage)
+        assertEquals("Invalid encrypted message length (47, should be >= 48)", ex.getMessage());
     }
 }

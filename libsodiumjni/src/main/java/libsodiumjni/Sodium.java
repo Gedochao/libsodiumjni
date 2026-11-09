@@ -62,7 +62,7 @@ public final class Sodium {
         checkKeyLength("secret key", secretKey, SodiumApi.crypto_box_secret_key_bytes());
         if (cipher.length < SodiumApi.crypto_box_seal_bytes()) {
             throw new RuntimeException(
-                    "Invalid encrypted message length (" + cipher.length + ", should be > " + SodiumApi.crypto_box_seal_bytes() + ")");
+                    "Invalid encrypted message length (" + cipher.length + ", should be >= " + SodiumApi.crypto_box_seal_bytes() + ")");
         }
         byte[] message = new byte[cipher.length - SodiumApi.crypto_box_seal_bytes()];
         int res = SodiumApi.crypto_box_seal_open(message, cipher, pubKey, secretKey);
