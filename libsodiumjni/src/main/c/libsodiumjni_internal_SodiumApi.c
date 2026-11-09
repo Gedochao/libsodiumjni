@@ -48,6 +48,18 @@ static unsigned char *checked_malloc(JNIEnv *env, size_t size) {
     return ptr;
 }
 
+/* Wipes a buffer that held secret data (plaintext, secret key), before it's freed or goes out of
+ * scope. Unlike memset, sodium_memzero can't be optimized away by the compiler. */
+static void wipe(void *buf, size_t len) {
+    sodium_memzero(buf, len);
+}
+
+/* Frees a buffer from checked_malloc that held secret data, after wiping it */
+static void free_wiped(unsigned char *buf, size_t len) {
+    wipe(buf, len > 0 ? len : 1);
+    free(buf);
+}
+
 JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_sodium_1init
   (JNIEnv *env, jclass cls) {
     return sodium_init();
@@ -87,6 +99,7 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1keypair
         (*env)->SetByteArrayRegion(env, secret_key, 0, crypto_box_SECRETKEYBYTES, (const jbyte *) recipient_sk);
     }
 
+    wipe(recipient_sk, sizeof recipient_sk);
     return res;
 }
 
@@ -123,7 +136,7 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal
         return LIBSODIUMJNI_EXCEPTION_THROWN;
     unsigned char *cipher_bytes = checked_malloc(env, (size_t) sealed_len);
     if (cipher_bytes == NULL) {
-        free(msg_bytes);
+        free_wiped(msg_bytes, (size_t) msg_len);
         return LIBSODIUMJNI_EXCEPTION_THROWN;
     }
 
@@ -137,7 +150,7 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal
     }
 
     free(cipher_bytes);
-    free(msg_bytes);
+    free_wiped(msg_bytes, (size_t) msg_len);
     return res;
 }
 
@@ -168,11 +181,14 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal_1o
     (*env)->GetByteArrayRegion(env, secret_key, 0, crypto_box_SECRETKEYBYTES, (jbyte *) sec_key_bytes);
 
     unsigned char *cipher_bytes = checked_malloc(env, (size_t) cipher_len);
-    if (cipher_bytes == NULL)
+    if (cipher_bytes == NULL) {
+        wipe(sec_key_bytes, sizeof sec_key_bytes);
         return LIBSODIUMJNI_EXCEPTION_THROWN;
+    }
     unsigned char *msg = checked_malloc(env, (size_t) msg_len);
     if (msg == NULL) {
         free(cipher_bytes);
+        wipe(sec_key_bytes, sizeof sec_key_bytes);
         return LIBSODIUMJNI_EXCEPTION_THROWN;
     }
 
@@ -184,8 +200,9 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal_1o
         (*env)->SetByteArrayRegion(env, decrypted, 0, msg_len, (const jbyte *) msg);
     }
 
-    free(msg);
+    free_wiped(msg, (size_t) msg_len);
     free(cipher_bytes);
+    wipe(sec_key_bytes, sizeof sec_key_bytes);
     return res;
 }
 
