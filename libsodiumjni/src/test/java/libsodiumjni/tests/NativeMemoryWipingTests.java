@@ -94,21 +94,18 @@ public class NativeMemoryWipingTests {
             String controlHex = HexFormat.of().formatHex(control);
 
             Path out = tmp.resolve("free_checker.out");
-            Path javaBin = Path.of(System.getProperty("java.home"), "bin", "java");
-            List<String> childCommand = List.of(
-                    javaBin.toString(),
-                    "-cp", System.getProperty("java.class.path"),
-                    FreeCheckerChild.class.getName(),
-                    secretHex, controlHex);
-            String childOutput = run(
-                    childCommand,
-                    tmp,
+            ChildJvm.Result child = ChildJvm.run(
+                    FreeCheckerChild.class,
+                    List.of(secretHex, controlHex),
                     Map.of(
                             isMac() ? "DYLD_INSERT_LIBRARIES" : "LD_PRELOAD", checker.toString(),
                             "FREE_CHECKER_SECRET", secretHex,
                             "FREE_CHECKER_CONTROL", controlHex,
-                            "FREE_CHECKER_OUT", out.toString()));
-            assertTrue("Child JVM didn't complete:\n" + childOutput, childOutput.contains("DONE"));
+                            "FREE_CHECKER_OUT", out.toString()),
+                    tmp);
+            assertTrue(
+                    "Child JVM didn't complete (exit code " + child.exitCode + "):\n" + child.output,
+                    child.exitCode == 0 && child.output.contains("DONE"));
 
             List<String> report = Files.exists(out) ? Files.readAllLines(out) : List.of();
             assertTrue("free_checker wasn't loaded in the child JVM", report.contains("ACTIVE"));

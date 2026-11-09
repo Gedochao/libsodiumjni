@@ -6,16 +6,20 @@ import libsodiumjni.internal.SodiumApi;
 
 public final class Sodium {
 
-    private static boolean initialized = false;
+    private static volatile boolean initialized = false;
 
     public static void init() {
         if (!initialized) {
             synchronized (Sodium.class) {
-                int res = SodiumApi.sodium_init();
-                if (res != 0) {
-                    throw new RuntimeException("Cannot initialize libsodium");
+                if (!initialized) {
+                    // sodium_init returns 0 if it initialized libsodium, 1 if libsodium was already
+                    // initialized (e.g. by another library in this process), and -1 on failure
+                    int res = SodiumApi.sodium_init();
+                    if (res < 0) {
+                        throw new RuntimeException("Cannot initialize libsodium (sodium_init returned " + res + ")");
+                    }
+                    initialized = true;
                 }
-                initialized = true;
             }
         }
     }
