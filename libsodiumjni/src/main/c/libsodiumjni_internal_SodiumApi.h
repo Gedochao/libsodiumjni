@@ -50,18 +50,18 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal_1b
 /*
  * Class:     libsodiumjni_internal_SodiumApi
  * Method:    crypto_box_seal
- * Signature: ([B[BJ[B)I
+ * Signature: ([B[B[B)I
  */
 JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal
-  (JNIEnv *, jclass, jbyteArray, jbyteArray, jlong, jbyteArray);
+  (JNIEnv *, jclass, jbyteArray, jbyteArray, jbyteArray);
 
 /*
  * Class:     libsodiumjni_internal_SodiumApi
  * Method:    crypto_box_seal_open
- * Signature: ([B[BI[B[B)I
+ * Signature: ([B[B[B[B)I
  */
 JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal_1open
-  (JNIEnv *, jclass, jbyteArray, jbyteArray, jint, jbyteArray, jbyteArray);
+  (JNIEnv *, jclass, jbyteArray, jbyteArray, jbyteArray, jbyteArray);
 
 #ifdef __cplusplus
 }

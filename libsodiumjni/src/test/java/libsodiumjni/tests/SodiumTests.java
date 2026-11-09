@@ -11,6 +11,7 @@ import java.util.Arrays;
 
 import libsodiumjni.KeyPair;
 import libsodiumjni.Sodium;
+import libsodiumjni.SodiumException;
 import libsodiumjni.internal.LoadLibrary;
 import libsodiumjni.internal.SodiumApi;
 import org.junit.BeforeClass;
@@ -109,7 +110,7 @@ public class SodiumTests {
         KeyPair other = Sodium.keyPair();
         byte[] cipher = Sodium.seal("secret".getBytes(StandardCharsets.UTF_8), recipient.getPubKey());
         assertThrows(
-                RuntimeException.class,
+                SodiumException.class,
                 () -> Sodium.sealOpen(cipher, other.getPubKey(), other.getSecKey()));
     }
 
@@ -119,15 +120,26 @@ public class SodiumTests {
         byte[] cipher = Sodium.seal("secret".getBytes(StandardCharsets.UTF_8), keyPair.getPubKey());
         cipher[cipher.length - 1] ^= 0x01;
         assertThrows(
-                RuntimeException.class,
+                SodiumException.class,
                 () -> Sodium.sealOpen(cipher, keyPair.getPubKey(), keyPair.getSecKey()));
     }
 
     @Test
     public void openTooShortCipherFails() {
         KeyPair keyPair = Sodium.keyPair();
-        assertThrows(
-                RuntimeException.class,
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
                 () -> Sodium.sealOpen(new byte[SEAL_BYTES - 1], keyPair.getPubKey(), keyPair.getSecKey()));
+        // SEAL_BYTES itself is accepted (empty message, see sealAndOpenEmptyMessage)
+        assertEquals("Invalid encrypted message length (47, should be >= 48)", ex.getMessage());
+    }
+
+    @Test
+    public void sealFailuresThrowSodiumException() {
+        // libsodium rejects an all-zero public key (low order point)
+        SodiumException ex = assertThrows(
+                SodiumException.class,
+                () -> Sodium.seal("secret".getBytes(StandardCharsets.UTF_8), new byte[PUBLIC_KEY_BYTES]));
+        assertEquals("Failed to seal message", ex.getMessage());
     }
 }

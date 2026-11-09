@@ -12,8 +12,8 @@ import libsodiumjni.internal.LoadLibrary;
  * Run in a fresh JVM by LoadLibraryInitializationTests, so that the native library isn't loaded
  * yet.
  *
- * <p>Argument: scenario, "load", "null-context-class-loader" or "concurrent". Prints "OK" and exits
- * with 0 on success.
+ * <p>Argument: scenario, "load", "null-context-class-loader", "concurrent" or "missing-resource".
+ * Prints "OK" and exits with 0 on success.
  */
 public class LoadLibraryChild {
 
@@ -21,6 +21,17 @@ public class LoadLibraryChild {
 
     public static void main(String[] args) throws Exception {
         switch (args[0]) {
+            case "missing-resource":
+                try {
+                    LoadLibrary.initializeFromResources("META-INF/native/missing/libsodiumjni.so");
+                    throw new AssertionError("Expected an exception");
+                } catch (IllegalStateException e) {
+                    if (!e.getMessage().equals("Resource META-INF/native/missing/libsodiumjni.so not found"))
+                        throw new AssertionError("Unexpected message: " + e.getMessage());
+                }
+                System.out.println("OK");
+                return;
+
             case "load":
                 LoadLibrary.initializeFromResources();
                 break;

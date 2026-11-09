@@ -88,19 +88,12 @@ public class SodiumInputValidationTests {
     // SodiumApi (public native bindings, used by Sodium)
 
     @Test
-    public void nativeSealRejectsMessageLengthPastMessageArray() {
+    public void nativeSealRejectsTooSmallCipherArray() {
         KeyPair keyPair = Sodium.keyPair();
         byte[] message = message();
-        long messageLen = message.length + 100L;
-        byte[] cipher = new byte[(int) (SEAL_BYTES + messageLen)];
-        assertEquals(INVALID_ARGUMENTS, SodiumApi.crypto_box_seal(cipher, message, messageLen, keyPair.getPubKey()));
-    }
-
-    @Test
-    public void nativeSealRejectsNegativeMessageLength() {
-        KeyPair keyPair = Sodium.keyPair();
-        byte[] cipher = new byte[SEAL_BYTES];
-        assertEquals(INVALID_ARGUMENTS, SodiumApi.crypto_box_seal(cipher, message(), -1L, keyPair.getPubKey()));
+        byte[] cipher = filled(SEAL_BYTES + message.length - 1);
+        assertEquals(INVALID_ARGUMENTS, SodiumApi.crypto_box_seal(cipher, message, keyPair.getPubKey()));
+        assertArrayEquals(filled(cipher.length), cipher);
     }
 
     @Test
@@ -109,7 +102,7 @@ public class SodiumInputValidationTests {
         byte[] cipher = new byte[SEAL_BYTES + message.length];
         assertEquals(
                 INVALID_ARGUMENTS,
-                SodiumApi.crypto_box_seal(cipher, message, message.length, new byte[KEY_BYTES - 1]));
+                SodiumApi.crypto_box_seal(cipher, message, new byte[KEY_BYTES - 1]));
     }
 
     @Test
@@ -118,7 +111,7 @@ public class SodiumInputValidationTests {
         byte[] message = message();
         int sealedLen = SEAL_BYTES + message.length;
         byte[] cipher = filled(sealedLen + 16);
-        assertEquals(0, SodiumApi.crypto_box_seal(cipher, message, message.length, keyPair.getPubKey()));
+        assertEquals(0, SodiumApi.crypto_box_seal(cipher, message, keyPair.getPubKey()));
         // the bytes past the sealed message must be left untouched
         assertArrayEquals(filled(16), Arrays.copyOfRange(cipher, sealedLen, cipher.length));
         // and the sealed message must be valid
@@ -134,7 +127,7 @@ public class SodiumInputValidationTests {
         byte[] decrypted = filled(16);
         assertEquals(
                 INVALID_ARGUMENTS,
-                SodiumApi.crypto_box_seal_open(decrypted, cipher, cipher.length, keyPair.getPubKey(), keyPair.getSecKey()));
+                SodiumApi.crypto_box_seal_open(decrypted, cipher, keyPair.getPubKey(), keyPair.getSecKey()));
         assertArrayEquals(filled(16), decrypted);
     }
 
@@ -145,7 +138,7 @@ public class SodiumInputValidationTests {
         byte[] decrypted = new byte[cipher.length];
         assertEquals(
                 INVALID_ARGUMENTS,
-                SodiumApi.crypto_box_seal_open(decrypted, cipher, cipher.length, keyPair.getPubKey(), keyPair.getSecKey()));
+                SodiumApi.crypto_box_seal_open(decrypted, cipher, keyPair.getPubKey(), keyPair.getSecKey()));
     }
 
     @Test
@@ -155,10 +148,10 @@ public class SodiumInputValidationTests {
         byte[] decrypted = new byte[cipher.length - SEAL_BYTES];
         assertEquals(
                 INVALID_ARGUMENTS,
-                SodiumApi.crypto_box_seal_open(decrypted, cipher, cipher.length, new byte[KEY_BYTES - 1], keyPair.getSecKey()));
+                SodiumApi.crypto_box_seal_open(decrypted, cipher, new byte[KEY_BYTES - 1], keyPair.getSecKey()));
         assertEquals(
                 INVALID_ARGUMENTS,
-                SodiumApi.crypto_box_seal_open(decrypted, cipher, cipher.length, keyPair.getPubKey(), new byte[KEY_BYTES - 1]));
+                SodiumApi.crypto_box_seal_open(decrypted, cipher, keyPair.getPubKey(), new byte[KEY_BYTES - 1]));
     }
 
     @Test

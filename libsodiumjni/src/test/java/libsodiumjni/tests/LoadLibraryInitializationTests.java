@@ -73,6 +73,11 @@ public class LoadLibraryInitializationTests {
     }
 
     @Test
+    public void missingResourceThrowsIllegalStateException() throws Exception {
+        withTmpDir(tmpDir -> runChild("missing-resource", tmpDir));
+    }
+
+    @Test
     public void extractedLibrariesDontPileUp() throws Exception {
         withTmpDir(tmpDir -> {
             runChild("load", tmpDir);
