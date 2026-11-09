@@ -9,8 +9,10 @@ public final class SodiumApi {
   public static native int crypto_box_keypair(byte[] pubKey, byte[] secretKey);
 
   public static native int crypto_box_seal_bytes();
-  public static native int crypto_box_seal(byte[] cipher, byte[] message, long messageLen, byte[] publicKey);
+  /** Seals the whole message, into the first crypto_box_seal_bytes() + message.length bytes of cipher */
+  public static native int crypto_box_seal(byte[] cipher, byte[] message, byte[] publicKey);
 
-  public static native int crypto_box_seal_open(byte[] decrypted, byte[] cipher, int cipherLen, byte[] pubKey, byte[] secretKey);
+  /** Opens the whole cipher, whose length must be crypto_box_seal_bytes() + decrypted.length */
+  public static native int crypto_box_seal_open(byte[] decrypted, byte[] cipher, byte[] pubKey, byte[] secretKey);
 
 }

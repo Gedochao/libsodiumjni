@@ -68,9 +68,9 @@ public class SodiumNullArgumentsTests {
         KeyPair keyPair = Sodium.keyPair();
         byte[] message = message();
         byte[] cipher = new byte[SEAL_BYTES + message.length];
-        assertNpe("cipher is null", () -> SodiumApi.crypto_box_seal(null, message, message.length, keyPair.getPubKey()));
-        assertNpe("message is null", () -> SodiumApi.crypto_box_seal(cipher, null, message.length, keyPair.getPubKey()));
-        assertNpe("public key is null", () -> SodiumApi.crypto_box_seal(cipher, message, message.length, null));
+        assertNpe("cipher is null", () -> SodiumApi.crypto_box_seal(null, message, keyPair.getPubKey()));
+        assertNpe("message is null", () -> SodiumApi.crypto_box_seal(cipher, null, keyPair.getPubKey()));
+        assertNpe("public key is null", () -> SodiumApi.crypto_box_seal(cipher, message, null));
     }
 
     @Test
@@ -80,9 +80,9 @@ public class SodiumNullArgumentsTests {
         byte[] decrypted = new byte[cipher.length - SEAL_BYTES];
         byte[] pk = keyPair.getPubKey();
         byte[] sk = keyPair.getSecKey();
-        assertNpe("decrypted is null", () -> SodiumApi.crypto_box_seal_open(null, cipher, cipher.length, pk, sk));
-        assertNpe("cipher is null", () -> SodiumApi.crypto_box_seal_open(decrypted, null, cipher.length, pk, sk));
-        assertNpe("public key is null", () -> SodiumApi.crypto_box_seal_open(decrypted, cipher, cipher.length, null, sk));
-        assertNpe("secret key is null", () -> SodiumApi.crypto_box_seal_open(decrypted, cipher, cipher.length, pk, null));
+        assertNpe("decrypted is null", () -> SodiumApi.crypto_box_seal_open(null, cipher, pk, sk));
+        assertNpe("cipher is null", () -> SodiumApi.crypto_box_seal_open(decrypted, null, pk, sk));
+        assertNpe("public key is null", () -> SodiumApi.crypto_box_seal_open(decrypted, cipher, null, sk));
+        assertNpe("secret key is null", () -> SodiumApi.crypto_box_seal_open(decrypted, cipher, pk, null));
     }
 }

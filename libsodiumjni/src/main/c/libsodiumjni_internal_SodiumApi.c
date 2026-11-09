@@ -109,7 +109,7 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal_1b
 }
 
 JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal
-  (JNIEnv *env, jclass cls, jbyteArray cipher, jbyteArray msg, jlong msg_len, jbyteArray pub_key) {
+  (JNIEnv *env, jclass cls, jbyteArray cipher, jbyteArray msg, jbyteArray pub_key) {
 
     if (is_null(env, cipher, "cipher is null") ||
         is_null(env, msg, "message is null") ||
@@ -117,16 +117,14 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal
         return LIBSODIUMJNI_EXCEPTION_THROWN;
 
     jsize cipher_len = (*env)->GetArrayLength(env, cipher);
-    jsize msg_array_len = (*env)->GetArrayLength(env, msg);
+    jsize msg_len = (*env)->GetArrayLength(env, msg);
     jsize pub_key_len = (*env)->GetArrayLength(env, pub_key);
 
-    /* msg_len <= msg_array_len (a jsize) ensures crypto_box_SEALBYTES + msg_len doesn't overflow */
-    if (msg_len < 0 || msg_len > msg_array_len ||
-        pub_key_len != crypto_box_PUBLICKEYBYTES ||
-        cipher_len < crypto_box_SEALBYTES + msg_len)
-        return LIBSODIUMJNI_INVALID_ARGUMENTS;
+    /* computed on 64 bits, as crypto_box_SEALBYTES + msg_len can exceed the jsize range */
+    long long sealed_len = (long long) crypto_box_SEALBYTES + msg_len;
 
-    jsize sealed_len = (jsize) (crypto_box_SEALBYTES + msg_len);
+    if (pub_key_len != crypto_box_PUBLICKEYBYTES || cipher_len < sealed_len)
+        return LIBSODIUMJNI_INVALID_ARGUMENTS;
 
     unsigned char pub_key_bytes[crypto_box_PUBLICKEYBYTES];
     (*env)->GetByteArrayRegion(env, pub_key, 0, crypto_box_PUBLICKEYBYTES, (jbyte *) pub_key_bytes);
@@ -140,13 +138,13 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal
         return LIBSODIUMJNI_EXCEPTION_THROWN;
     }
 
-    (*env)->GetByteArrayRegion(env, msg, 0, (jsize) msg_len, (jbyte *) msg_bytes);
+    (*env)->GetByteArrayRegion(env, msg, 0, msg_len, (jbyte *) msg_bytes);
 
     int res = crypto_box_seal(cipher_bytes, msg_bytes, (unsigned long long) msg_len, pub_key_bytes);
 
     if (res == 0) {
         /* only copy what crypto_box_seal wrote, not uninitialized memory past it */
-        (*env)->SetByteArrayRegion(env, cipher, 0, sealed_len, (const jbyte *) cipher_bytes);
+        (*env)->SetByteArrayRegion(env, cipher, 0, (jsize) sealed_len, (const jbyte *) cipher_bytes);
     }
 
     free(cipher_bytes);
@@ -155,7 +153,7 @@ JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal
 }
 
 JNIEXPORT jint JNICALL Java_libsodiumjni_internal_SodiumApi_crypto_1box_1seal_1open
-  (JNIEnv *env, jclass cls, jbyteArray decrypted, jbyteArray cipher, jint cipherLen, jbyteArray pub_key, jbyteArray secret_key) {
+  (JNIEnv *env, jclass cls, jbyteArray decrypted, jbyteArray cipher, jbyteArray pub_key, jbyteArray secret_key) {
 
     if (is_null(env, decrypted, "decrypted is null") ||
         is_null(env, cipher, "cipher is null") ||

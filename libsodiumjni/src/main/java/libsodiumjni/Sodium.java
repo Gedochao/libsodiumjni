@@ -47,7 +47,7 @@ public final class Sodium {
         Objects.requireNonNull(pubKey, "public key is null");
         checkKeyLength("public key", pubKey, SodiumApi.crypto_box_public_key_bytes());
         byte[] cipher = new byte[SodiumApi.crypto_box_seal_bytes() + message.length];
-        int res = SodiumApi.crypto_box_seal(cipher, message, message.length, pubKey);
+        int res = SodiumApi.crypto_box_seal(cipher, message, pubKey);
         if (res != 0) {
             throw new RuntimeException("Failed to seal message");
         }
@@ -65,7 +65,7 @@ public final class Sodium {
                     "Invalid encrypted message length (" + cipher.length + ", should be > " + SodiumApi.crypto_box_seal_bytes() + ")");
         }
         byte[] message = new byte[cipher.length - SodiumApi.crypto_box_seal_bytes()];
-        int res = SodiumApi.crypto_box_seal_open(message, cipher, cipher.length, pubKey, secretKey);
+        int res = SodiumApi.crypto_box_seal_open(message, cipher, pubKey, secretKey);
         if (res != 0) {
             throw new RuntimeException("Failed to open seal");
         }
