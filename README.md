@@ -60,6 +60,7 @@ Sodium.init(); // optional, the other methods call it if needed
 KeyPair keyPair = Sodium.keyPair();
 byte[] cipher = Sodium.seal(message, keyPair.getPubKey());
 byte[] decrypted = Sodium.sealOpen(cipher, keyPair.getPubKey(), keyPair.getSecKey());
+keyPair.destroy(); // wipes its copy of the secret key, once not needed anymore
 ```
 
 The native library is loaded at most once per JVM, and `Sodium.init` can be called several times, from several threads. Errors are reported with:
