@@ -40,11 +40,19 @@ public class LoadLibraryInitializationTests {
     }
 
     private static void runChild(String scenario, Path tmpDir, String... extraArgs) throws Exception {
+        runChildWithOptions(List.of(), scenario, tmpDir, extraArgs);
+    }
+
+    private static void runChildWithOptions(List<String> jvmOptions, String scenario, Path tmpDir, String... extraArgs)
+            throws Exception {
         List<String> args = new ArrayList<>();
         args.add(scenario);
         args.addAll(List.of(extraArgs));
+        List<String> options = new ArrayList<>();
+        options.add("-Djava.io.tmpdir=" + tmpDir);
+        options.addAll(jvmOptions);
         ChildJvm.Result result = ChildJvm.run(
-                List.of("-Djava.io.tmpdir=" + tmpDir),
+                options,
                 LoadLibraryChild.class,
                 args,
                 Map.of(),
@@ -188,6 +196,35 @@ public class LoadLibraryInitializationTests {
         withTmpDir(tmpDir -> {
             runChild("assume-initialized", tmpDir);
             assertEquals(List.of(), files(tmpDir));
+        });
+    }
+
+    @Test
+    public void tmpdirPropertySetsWhereTheLibraryIsExtracted() throws Exception {
+        // e.g. when the default temporary directory is mounted with noexec
+        withTmpDir(dir -> {
+            Path libDir = Files.createDirectory(dir.resolve("libsodiumjni tmp"));
+            // java.io.tmpdir doesn't exist: extracting the library there would fail
+            Path missingTmpDir = dir.resolve("missing");
+            runChildWithOptions(List.of("-Dlibsodiumjni.tmpdir=" + libDir), "load", missingTmpDir);
+            List<String> files = files(libDir);
+            assertTrue(
+                    "Expected at most " + maxLeftOverFiles() + " file(s) left in " + libDir + ", got " + files,
+                    files.size() <= maxLeftOverFiles());
+        });
+    }
+
+    @Test
+    public void loadingErrorsGiveTheExtractionDirectory() throws Exception {
+        withTmpDir(tmpDir -> runChild("unloadable", tmpDir));
+    }
+
+    @Test
+    public void loadingErrorsGiveTheExtractionDirectoryFromTheTmpdirProperty() throws Exception {
+        withTmpDir(dir -> {
+            Path libDir = Files.createDirectory(dir.resolve("lib"));
+            Path tmpDir = Files.createDirectory(dir.resolve("tmp"));
+            runChildWithOptions(List.of("-Dlibsodiumjni.tmpdir=" + libDir), "unloadable", tmpDir);
         });
     }
 }

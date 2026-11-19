@@ -7,13 +7,41 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Reads the names of the DLLs a 64-bit PE file (Windows DLL) imports, from its import and delay-load
- * import tables, like {@code dumpbin /dependents} (which is only available from a Visual Studio
- * environment).
+ * Reads 64-bit PE files (Windows DLLs), for what {@code dumpbin} would show, as it's only available
+ * from a Visual Studio environment: the DLLs they import ({@code dumpbin /dependents}), and their
+ * DLL characteristics ({@code dumpbin /headers}).
  */
-final class PeImports {
+final class PeFile {
 
-    private PeImports() {}
+    private PeFile() {}
+
+    /** IMAGE_DLLCHARACTERISTICS_* flags */
+    static final int HIGH_ENTROPY_VA = 0x0020;
+    static final int DYNAMIC_BASE = 0x0040;
+    static final int NX_COMPAT = 0x0100;
+    static final int GUARD_CF = 0x4000;
+
+    /** DllCharacteristics field of the optional header */
+    static int dllCharacteristics(byte[] content) {
+        ByteBuffer buf = ByteBuffer.wrap(content).order(ByteOrder.LITTLE_ENDIAN);
+        int optionalHeader = optionalHeader(buf, content);
+        // at offset 70 in the optional header (PE32+)
+        return Short.toUnsignedInt(buf.getShort(optionalHeader + 70));
+    }
+
+    /** Offset of the PE32+ optional header */
+    private static int optionalHeader(ByteBuffer buf, byte[] content) {
+        if (content.length < 0x40 || content[0] != 'M' || content[1] != 'Z')
+            throw new IllegalArgumentException("Not a PE file (no MZ header)");
+        int pe = buf.getInt(0x3c);
+        if (buf.getInt(pe) != 0x00004550)
+            throw new IllegalArgumentException("Not a PE file (no PE signature)");
+        int optionalHeader = pe + 4 + 20;
+        int magic = Short.toUnsignedInt(buf.getShort(optionalHeader));
+        if (magic != PE32_PLUS_MAGIC)
+            throw new IllegalArgumentException("Not a 64-bit PE file (optional header magic " + Integer.toHexString(magic) + ")");
+        return optionalHeader;
+    }
 
     private static final int PE32_PLUS_MAGIC = 0x20b;
     private static final int IMPORT_DIRECTORY = 1;
@@ -21,19 +49,10 @@ final class PeImports {
 
     static List<String> importedDlls(byte[] content) {
         ByteBuffer buf = ByteBuffer.wrap(content).order(ByteOrder.LITTLE_ENDIAN);
-        if (content.length < 0x40 || content[0] != 'M' || content[1] != 'Z')
-            throw new IllegalArgumentException("Not a PE file (no MZ header)");
-        int pe = buf.getInt(0x3c);
-        if (buf.getInt(pe) != 0x00004550)
-            throw new IllegalArgumentException("Not a PE file (no PE signature)");
-
-        int coffHeader = pe + 4;
+        int optionalHeader = optionalHeader(buf, content);
+        int coffHeader = optionalHeader - 20;
         int numberOfSections = Short.toUnsignedInt(buf.getShort(coffHeader + 2));
         int sizeOfOptionalHeader = Short.toUnsignedInt(buf.getShort(coffHeader + 16));
-        int optionalHeader = coffHeader + 20;
-        int magic = Short.toUnsignedInt(buf.getShort(optionalHeader));
-        if (magic != PE32_PLUS_MAGIC)
-            throw new IllegalArgumentException("Not a 64-bit PE file (optional header magic " + Integer.toHexString(magic) + ")");
         // PE32+: the data directories (RVA and size, 8 bytes each) start at offset 112
         int dataDirectories = optionalHeader + 112;
         int sectionTable = optionalHeader + sizeOfOptionalHeader;

@@ -1,6 +1,7 @@
 package build.project.settings.tests
 
 import build.project.settings.{
+  linuxLinkOptions,
   unixCompileOptions,
   windowsClOptions,
   windowsLibOptions,
@@ -31,4 +32,45 @@ object `package` extends mill.Module:
     if failures.nonEmpty then
       sys.error(failures.mkString(s"${failures.size} failure(s):\n", "\n", ""))
     println("warnings are errors on all OSes")
+  }
+
+  /**
+   * Checks that the native libraries are linked with the hardening options of each OS:
+   * `./mill -i 'project.settings.tests._'`. The resulting binaries are checked by
+   * NativeLibraryHardeningTests.
+   */
+  def testHardeningOptions() = mill.Task.Command {
+    def check(tool: String, options: Seq[String], required: String*): Seq[String] =
+      required.filterNot(options.contains).map(opt => s"$tool options ($options) lack $opt")
+    val disabling =
+      Seq("/DYNAMICBASE:NO", "/HIGHENTROPYVA:NO", "/NXCOMPAT:NO", "/guard:cf-", "/guard:no")
+    val failures =
+      // -z defs: undefined symbols fail the link, rather than the loading of the library.
+      // relro + now: full RELRO (GOT read-only once loaded). noexecstack: non-executable stack.
+      check(
+        "gcc (Linux link)",
+        linuxLinkOptions,
+        "-Wl,-z,defs",
+        "-Wl,-z,relro",
+        "-Wl,-z,now",
+        "-Wl,-z,noexecstack"
+      ) ++
+        // Control Flow Guard needs both the compiler and the linker option
+        check("cl", windowsClOptions, "/guard:cf") ++
+        // explicit, rather than relying on the linker defaults: ASLR (with 64-bit addresses),
+        // DEP, Control Flow Guard
+        check(
+          "link",
+          windowsLinkOptions,
+          "/DYNAMICBASE",
+          "/HIGHENTROPYVA",
+          "/NXCOMPAT",
+          "/guard:cf"
+        ) ++
+        disabling
+          .filter((windowsClOptions ++ windowsLinkOptions).contains)
+          .map(opt => s"$opt disables hardening")
+    if failures.nonEmpty then
+      sys.error(failures.mkString(s"${failures.size} failure(s):\n", "\n", ""))
+    println("hardening options OK")
   }

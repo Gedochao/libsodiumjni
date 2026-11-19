@@ -29,4 +29,22 @@ public class SodiumInitTests {
     public void concurrentInitCallsSucceed() throws Exception {
         assertChildSucceeds("concurrent");
     }
+
+    // The Sodium methods initialize libsodium themselves if needed (sodium_init picks the fastest
+    // implementations for the CPU, and initializes the random number generator)
+
+    @Test
+    public void keyPairInitializesLibsodium() throws Exception {
+        assertChildSucceeds("auto-init-key-pair");
+    }
+
+    @Test
+    public void sealInitializesLibsodium() throws Exception {
+        assertChildSucceeds("auto-init-seal");
+    }
+
+    @Test
+    public void sealOpenInitializesLibsodium() throws Exception {
+        assertChildSucceeds("auto-init-seal-open");
+    }
 }

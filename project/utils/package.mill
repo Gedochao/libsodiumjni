@@ -59,19 +59,25 @@ def isArmArchitecture: Boolean =
   hostArch == "aarch64"
 
 /**
- * Directory, under META-INF/native in the JAR, of the native library with the passed classifier.
+ * Supported platforms: classifier -> directory, under META-INF/native in the JAR, of its native
+ * library.
  *
- * Must match libsodiumjni.internal.LoadLibrary.resourcePath().
+ * Must match libsodiumjni.internal.LoadLibrary.resourcePath(), the README, and
+ * .github/scripts/check-release-natives.sh (checked by PlatformTableTests, which gets this table
+ * from the build).
  */
+val nativeResourceDirs: Seq[(String, String)] = Seq(
+  "x86_64-pc-linux"      -> "linux64",
+  "aarch64-pc-linux"     -> "linux-aarch64",
+  "x86_64-apple-darwin"  -> "darwin",
+  "aarch64-apple-darwin" -> "arm-darwin",
+  "x86_64-pc-win32"      -> "windows64",
+  "aarch64-pc-win32"     -> "windows-aarch64"
+)
+
+/** Directory, under META-INF/native in the JAR, of the native library with the passed classifier */
 def nativeResourceDir(classifier: String): String =
-  classifier match
-    case "x86_64-apple-darwin"  => "darwin"
-    case "aarch64-apple-darwin" => "arm-darwin"
-    case "x86_64-pc-linux"      => "linux64"
-    case "aarch64-pc-linux"     => "linux-aarch64"
-    case "x86_64-pc-win32"      => "windows64"
-    case "aarch64-pc-win32"     => "windows-aarch64"
-    case other                  => sys.error(s"Unrecognized classifier: $other")
+  nativeResourceDirs.toMap.getOrElse(classifier, sys.error(s"Unrecognized classifier: $classifier"))
 
 /** Hex-encoded SHA-256 of a file */
 def sha256Hex(file: os.Path): String =

@@ -19,3 +19,4 @@ target/
 # Claude Code local files (keep the skills symlink)
 .claude/*
 !.claude/skills
+/.cellar/
