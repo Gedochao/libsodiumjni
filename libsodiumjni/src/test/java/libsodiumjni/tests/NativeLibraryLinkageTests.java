@@ -214,7 +214,7 @@ public class NativeLibraryLinkageTests {
             content = is.readAllBytes();
         }
 
-        List<String> imported = PeImports.importedDlls(content);
+        List<String> imported = PeFile.importedDlls(content);
         assertFalse("No imported DLLs found, is the import table parsed correctly?", imported.isEmpty());
         List<String> nonSystem = imported.stream().filter(dll -> !isWindowsSystemDll(dll)).collect(Collectors.toList());
         assertTrue(

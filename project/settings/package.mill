@@ -50,17 +50,44 @@ def unixCompileOptions: Seq[String] = Seq(
 )
 
 /**
+ * gcc options (Linux) when linking the shared library: undefined symbols fail the link (rather
+ * than the loading of the library), full RELRO (relocations read-only once loaded, needs "now"),
+ * non-executable stack. Checked on the binary by NativeLibraryHardeningTests.
+ */
+def linuxLinkOptions: Seq[String] =
+  Seq("-Wl,-z,defs", "-Wl,-z,relro", "-Wl,-z,now", "-Wl,-z,noexecstack")
+
+/**
  * cl options (Windows) for the C sources, besides include directories. /WX: warnings are errors,
  * like -Werror on Linux / macOS
  */
-def windowsClOptions: Seq[String] = Seq("/utf-8", "/O2", "/W4", "/WX")
+def windowsClOptions: Seq[String] =
+  Seq(
+    "/utf-8",
+    "/O2",
+    "/W4",
+    "/WX",
+    // Control Flow Guard (along with link /guard:cf)
+    "/guard:cf"
+  )
 
 /**
  * link options (Windows) for the DLL, besides its output path. /WX: warnings are errors, e.g.
  * LNK4098 when objects built against different C runtimes are linked together (see the static
  * libsodium in build.mill)
  */
-def windowsLinkOptions: Seq[String] = Seq("/DLL", "/WX")
+def windowsLinkOptions: Seq[String] =
+  Seq(
+    "/DLL",
+    "/WX",
+    // explicit, rather than relying on the linker defaults: ASLR (with 64-bit addresses), DEP.
+    // Checked on the binary by NativeLibraryHardeningTests.
+    "/DYNAMICBASE",
+    "/HIGHENTROPYVA",
+    "/NXCOMPAT",
+    // Control Flow Guard (along with cl /guard:cf)
+    "/guard:cf"
+  )
 
 /** lib options (Windows) for the static library, besides its output path */
 def windowsLibOptions: Seq[String] = Seq("/WX")
@@ -627,7 +654,7 @@ trait JniUnixModule extends Module:
         generateUnixSo(
           dllName0,
           unixExtension0,
-          Nil,
+          linuxLinkOptions,
           objs,
           destDir,
           unixLinkingLibs(),
