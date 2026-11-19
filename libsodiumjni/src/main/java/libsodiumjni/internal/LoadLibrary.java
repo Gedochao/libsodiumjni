@@ -19,8 +19,16 @@ import java.util.Locale;
  * <p>The library is loaded at most once per JVM: once it is loaded, by any of the methods here (or
  * marked as loaded with {@link #assumeInitialized()}), later calls to them do nothing, even if they
  * are passed another path.
+ *
+ * <p>{@link #initializeFromResources()} extracts the library to the directory given by the {@value
+ * #TMPDIR_PROPERTY} system property, or, if it's not set, to the default temporary directory
+ * ({@code java.io.tmpdir}). Loading libraries from a directory can be forbidden (e.g. when it's
+ * mounted with noexec on Linux), in which case set that property to a directory that allows it.
  */
 public final class LoadLibrary {
+
+    /** System property: directory where the native library is extracted from the resources */
+    public static final String TMPDIR_PROPERTY = "libsodiumjni.tmpdir";
 
     private static volatile boolean initialized = false;
 
@@ -133,16 +141,41 @@ public final class LoadLibrary {
         }
     }
 
+    /** Directory where the native library is extracted from the resources */
+    private static Path extractionDir() {
+        String dir = System.getProperty(TMPDIR_PROPERTY);
+        if (dir == null || dir.isEmpty())
+            dir = System.getProperty("java.io.tmpdir");
+        return Paths.get(dir);
+    }
+
+    /**
+     * System.load, with the directory the library was extracted to and how to change it in the error
+     * message, if it fails (still an UnsatisfiedLinkError, with the original one as cause)
+     */
+    private static void loadExtracted(Path lib) {
+        try {
+            System.load(lib.toString());
+        } catch (UnsatisfiedLinkError e) {
+            UnsatisfiedLinkError error = new UnsatisfiedLinkError(
+                    e.getMessage() + " (libsodiumjni extracted its native library to " + lib.getParent()
+                            + ". If libraries can't be loaded from there, e.g. if it's mounted with noexec, "
+                            + "set the " + TMPDIR_PROPERTY + " system property to another directory)");
+            error.initCause(e);
+            throw error;
+        }
+    }
+
     /**
      * Linux / macOS: a loaded library can be deleted right away (it stays mapped), so it's extracted
-     * to a randomly named temporary file (not a predictable one, as the temporary directory is
+     * (to the temporary directory, or the {@value #TMPDIR_PROPERTY} one) to a randomly named file (not a predictable one, as the temporary directory is
      * usually shared between users), which is deleted once loaded.
      */
     private static void loadAndDelete(byte[] content) throws IOException {
-        Path lib = Files.createTempFile("libsodiumjni-", libSuffix());
+        Path lib = Files.createTempFile(extractionDir(), "libsodiumjni-", libSuffix());
         try {
             Files.write(lib, content);
-            System.load(lib.toString());
+            loadExtracted(lib);
         } finally {
             Files.deleteIfExists(lib);
         }
@@ -151,11 +184,12 @@ public final class LoadLibrary {
     /**
      * Windows: a loaded DLL can't be deleted, so rather than leaving a new file behind on every run,
      * it's extracted once to a file named after its content hash in the temporary directory (per user
-     * on Windows), and that file is re-used as long as its content matches.
+     * on Windows) or the {@value #TMPDIR_PROPERTY} one, and that file is re-used as long as its content
+     * matches.
      */
     private static void loadFromWindowsCache(byte[] content) throws IOException {
         String hash = sha256(content);
-        Path tmpDir = Paths.get(System.getProperty("java.io.tmpdir"));
+        Path tmpDir = extractionDir();
         Path lib = tmpDir.resolve("libsodiumjni-" + hash + ".dll");
 
         if (!hasContent(lib, content)) {
@@ -170,7 +204,7 @@ public final class LoadLibrary {
                 throw new IOException("Could not extract the native library to " + lib);
         }
 
-        System.load(lib.toString());
+        loadExtracted(lib);
     }
 
     /**

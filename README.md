@@ -63,6 +63,8 @@ byte[] decrypted = Sodium.sealOpen(cipher, keyPair.getPubKey(), keyPair.getSecKe
 keyPair.destroy(); // wipes its copy of the secret key, once not needed anymore
 ```
 
+`LoadLibrary.initializeFromResources()` extracts the native library to the temporary directory (`java.io.tmpdir`) before loading it. If libraries can't be loaded from there (e.g. on Linux, when it's mounted with `noexec`, which loading then fails with an `UnsatisfiedLinkError` mentioning it), pass another directory with `-Dlibsodiumjni.tmpdir=/path/to/dir`.
+
 The native library is loaded at most once per JVM, and `Sodium.init` can be called several times, from several threads. Errors are reported with:
 - `IllegalArgumentException` / `NullPointerException`, for invalid arguments (keys of the wrong length, cipher too short, message too long for the sealed message to fit in an array, null arrays, …)
 - `libsodiumjni.SodiumException`, when libsodium fails, e.g. when a cipher can't be opened, because of a wrong key pair, or a corrupted / tampered cipher. Its message has the return code of the libsodium function, e.g. `Failed to open seal (crypto_box_seal_open returned -1)`

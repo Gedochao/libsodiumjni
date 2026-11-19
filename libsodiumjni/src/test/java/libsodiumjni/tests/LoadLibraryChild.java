@@ -16,7 +16,7 @@ import libsodiumjni.internal.SodiumApi;
  * yet.
  *
  * <p>Arguments: scenario, "load", "null-context-class-loader", "concurrent", "missing-resource",
- * "assume-initialized", "initialize-path" or "initialize-path-retry", followed, for the
+ * "assume-initialized", "unloadable", "initialize-path" or "initialize-path-retry", followed, for the
  * "initialize-path*" ones, by the path of the native library to load. Prints "OK" and exits with 0
  * on success.
  */
@@ -71,6 +71,26 @@ public class LoadLibraryChild {
                     System.exit(1);
                 }
                 break;
+
+            case "unloadable":
+                // not a library: loading it fails, as when the directory it's extracted to doesn't
+                // allow loading libraries (e.g. mounted with noexec)
+                try {
+                    LoadLibrary.initializeFromResources("not-a-native-library.bin");
+                    throw new AssertionError("Expected an UnsatisfiedLinkError");
+                } catch (UnsatisfiedLinkError e) {
+                    String dir = System.getProperty("libsodiumjni.tmpdir", System.getProperty("java.io.tmpdir"));
+                    String message = e.getMessage();
+                    if (message == null || !message.contains(dir) || !message.contains("libsodiumjni.tmpdir"))
+                        throw new AssertionError(
+                                "Expected the error to give the extraction directory (" + dir + ") and the "
+                                        + "libsodiumjni.tmpdir property, got: " + message,
+                                e);
+                    if (!(e.getCause() instanceof UnsatisfiedLinkError) || !message.contains(e.getCause().getMessage()))
+                        throw new AssertionError("Expected the original error as cause and in the message", e);
+                }
+                System.out.println("OK");
+                return;
 
             case "assume-initialized":
                 // e.g. a GraalVM native image, where the library is linked statically
