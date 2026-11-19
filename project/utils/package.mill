@@ -72,3 +72,22 @@ def nativeResourceDir(classifier: String): String =
     case "x86_64-pc-win32"      => "windows64"
     case "aarch64-pc-win32"     => "windows-aarch64"
     case other                  => sys.error(s"Unrecognized classifier: $other")
+
+/** Hex-encoded SHA-256 of a file */
+def sha256Hex(file: os.Path): String =
+  val digest = java.security.MessageDigest.getInstance("SHA-256")
+  val is     = os.read.inputStream(file)
+  try
+    val buf = new Array[Byte](1 << 16)
+    var n   = is.read(buf)
+    while n >= 0 do
+      digest.update(buf, 0, n)
+      n = is.read(buf)
+  finally is.close()
+  digest.digest().map(b => f"$b%02x").mkString
+
+/** Fails if file (downloaded from url) doesn't have the expected SHA-256 */
+def checkSha256(file: os.Path, url: String, expectedSha256: String): Unit =
+  val actual = sha256Hex(file)
+  if expectedSha256.isEmpty || actual != expectedSha256.toLowerCase(Locale.ROOT) then
+    sys.error(s"Unexpected SHA-256 for $url ($file): $actual, expected $expectedSha256")

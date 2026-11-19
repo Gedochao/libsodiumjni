@@ -1,0 +1,42 @@
+package build.project.utils.tests
+
+import build.project.utils.{checkSha256, sha256Hex}
+
+object `package` extends mill.Module:
+
+  /**
+   * Checks the SHA-256 verification of downloads (run on the CI, there's no test module for the
+   * build code): `./mill -i 'project.utils.tests._'`
+   */
+  def testCheckSha256() = mill.Task.Command {
+    val dir = os.temp.dir(prefix = "libsodiumjni-sha256-tests")
+    try
+      val file = dir / "abc.txt"
+      os.write(file, "abc")
+      // SHA-256 test vector from FIPS 180-2
+      val abcSha256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+      val url       = "https://example.com/abc.txt"
+
+      def error(expected: String): Option[String] =
+        scala.util.Try(checkSha256(file, url, expected)).failed.toOption.map(_.getMessage)
+
+      val failures = Seq(
+        Option.when(sha256Hex(file) != abcSha256)(
+          s"sha256Hex: expected $abcSha256, got ${sha256Hex(file)}"
+        ),
+        error(abcSha256).map(msg => s"the right checksum should be accepted, got: $msg"),
+        error(abcSha256.toUpperCase).map(msg => s"checksums should be case-insensitive, got: $msg"),
+        error("00" * 32) match
+          case None => Some("a wrong checksum should be rejected")
+          case Some(msg) =>
+            Option.when(!(msg.contains(url) && msg.contains(abcSha256) && msg.contains("00" * 32)))(
+              s"the error should give the URL, the actual and the expected checksums, got: $msg"
+            )
+        ,
+        Option.when(error("").isEmpty)("an empty expected checksum should be rejected")
+      ).flatten
+      if failures.nonEmpty then
+        sys.error(failures.mkString(s"${failures.size} failure(s):\n", "\n", ""))
+      println("checkSha256 OK")
+    finally os.remove.all(dir)
+  }

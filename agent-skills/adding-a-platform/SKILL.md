@@ -23,9 +23,10 @@ platform (`FetchExternalBinary.platformSuffix` in Scala CLI). Check Scala CLI's 
    architecture (an emulated JDK would build the native library for the wrong architecture), and download its
    artifacts in the `check-release-natives` and `release` jobs.
 
-4. **Release check**: add a row to `.github/scripts/check-release-natives.sh` (classifier, resource directory,
-   extensions, expected `file -b` output). Check the pattern against a real binary of that architecture, and against
-   one of another architecture.
+4. **Release check**: add a row to `platforms` in `.github/scripts/check-release-natives.sh` (classifier, resource
+   directory, extensions, extended regular expression for the `file -b` output). The output format depends on the
+   version of `file` (the CI's and yours can differ): add actual outputs for a binary of that architecture to
+   `check-release-natives-test.sh`, which checks that each one only matches the pattern of its own platform.
 
 5. **Docs**: platforms table in `README.md`.
 
