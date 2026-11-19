@@ -12,8 +12,9 @@ import libsodiumjni.internal.SodiumApi;
 /**
  * Run in a fresh JVM by SodiumInitTests, so that neither libsodium nor Sodium are initialized yet.
  *
- * <p>Argument: scenario, "already-initialized" or "concurrent". Prints "OK" and exits with 0 on
- * success.
+ * <p>Argument: scenario, "already-initialized", "concurrent", or "auto-init-key-pair",
+ * "auto-init-seal", "auto-init-seal-open" (Sodium.init() not called, the Sodium method must
+ * initialize libsodium itself). Prints "OK" and exits with 0 on success.
  */
 public class SodiumInitChild {
 
@@ -56,6 +57,31 @@ public class SodiumInitChild {
                 }
                 break;
 
+            case "auto-init-key-pair":
+                Sodium.keyPair();
+                checkLibsodiumInitialized();
+                break;
+
+            case "auto-init-seal": {
+                // key pair from the native method, which doesn't initialize libsodium
+                byte[] pk = new byte[32];
+                SodiumApi.crypto_box_keypair(pk, new byte[32]);
+                Sodium.seal(new byte[] {1, 2, 3}, pk);
+                checkLibsodiumInitialized();
+                break;
+            }
+
+            case "auto-init-seal-open": {
+                byte[] pk = new byte[32];
+                byte[] sk = new byte[32];
+                SodiumApi.crypto_box_keypair(pk, sk);
+                byte[] cipher = new byte[48 + 3];
+                SodiumApi.crypto_box_seal(cipher, new byte[] {1, 2, 3}, pk);
+                Sodium.sealOpen(cipher, pk, sk);
+                checkLibsodiumInitialized();
+                break;
+            }
+
             default:
                 throw new IllegalArgumentException("Unknown scenario: " + args[0]);
         }
@@ -63,5 +89,12 @@ public class SodiumInitChild {
         // libsodium must be usable afterwards
         Sodium.seal(new byte[] {1, 2, 3}, Sodium.keyPair().getPubKey());
         System.out.println("OK");
+    }
+
+    /** sodium_init returns 1 if libsodium was already initialized, 0 if it initialized it */
+    private static void checkLibsodiumInitialized() {
+        int res = SodiumApi.sodium_init();
+        if (res != 1)
+            throw new AssertionError("Expected libsodium to be initialized already (sodium_init returning 1), got " + res);
     }
 }

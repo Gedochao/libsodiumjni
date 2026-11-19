@@ -140,6 +140,18 @@ public class SodiumTests {
         SodiumException ex = assertThrows(
                 SodiumException.class,
                 () -> Sodium.seal("secret".getBytes(StandardCharsets.UTF_8), new byte[PUBLIC_KEY_BYTES]));
-        assertEquals("Failed to seal message", ex.getMessage());
+        // with libsodium's return code, to tell its failures apart from those of the bindings
+        assertEquals("Failed to seal message (crypto_box_seal returned -1)", ex.getMessage());
+    }
+
+    @Test
+    public void openFailuresGiveLibsodiumReturnCode() {
+        KeyPair recipient = Sodium.keyPair();
+        KeyPair other = Sodium.keyPair();
+        byte[] cipher = Sodium.seal("secret".getBytes(StandardCharsets.UTF_8), recipient.getPubKey());
+        SodiumException ex = assertThrows(
+                SodiumException.class,
+                () -> Sodium.sealOpen(cipher, other.getPubKey(), other.getSecKey()));
+        assertEquals("Failed to open seal (crypto_box_seal_open returned -1)", ex.getMessage());
     }
 }

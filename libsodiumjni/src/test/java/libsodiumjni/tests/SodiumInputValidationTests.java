@@ -7,11 +7,14 @@ import static org.junit.Assert.assertTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
 import libsodiumjni.KeyPair;
 import libsodiumjni.Sodium;
 import libsodiumjni.internal.LoadLibrary;
 import libsodiumjni.internal.SodiumApi;
+import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -83,6 +86,19 @@ public class SodiumInputValidationTests {
                 IllegalArgumentException.class,
                 () -> Sodium.sealOpen(cipher, keyPair.getPubKey(), new byte[KEY_BYTES - 1]));
         assertEquals("Invalid secret key length (31, expected 32)", ex.getMessage());
+    }
+
+    @Test
+    public void sealRejectsMessagesTooLongForTheSealedMessage() throws Exception {
+        // a message of ~2 GiB, in a child JVM with a large enough heap (rather than in this one)
+        ChildJvm.Result result = ChildJvm.run(List.of("-Xmx3g"), HugeMessageChild.class, List.of(), Map.of(), null);
+        Assume.assumeFalse("Can't allocate a 2 GiB array here: " + result.output, result.output.startsWith("SKIP"));
+        assertTrue(
+                "Expected an IllegalArgumentException (exit code " + result.exitCode + "):\n" + result.output,
+                result.exitCode == 0 && result.output.startsWith("OK"));
+        assertTrue(
+                result.output,
+                result.output.contains("Message too long (2147483600 bytes, should be <= 2147483599)"));
     }
 
     // SodiumApi (public native bindings, used by Sodium)
