@@ -13,7 +13,7 @@ platform (`FetchExternalBinary.platformSuffix` in Scala CLI). Check Scala CLI's 
    `UnsupportedOperationException`, rather than falling back to another architecture's library.
 
 2. **Build**:
-   - `nativeResourceDir` in `project/utils/package.mill`: classifier → resource directory (must match `LoadLibrary`)
+   - `nativeResourceDirs` in `project/utils/package.mill`: classifier → resource directory (must match `LoadLibrary`)
    - classifier of the build machine: `osClassifier` / `windowsClassifier` in `project/settings/package.mill`,
      derived from `hostArch` (the `os.arch` of the JVM running Mill)
    - toolchain / libsodium for that platform in `build.mill` (libsodium source build on Linux / macOS, MSVC build
@@ -29,6 +29,9 @@ platform (`FetchExternalBinary.platformSuffix` in Scala CLI). Check Scala CLI's 
    `check-release-natives-test.sh`, which checks that each one only matches the pattern of its own platform.
 
 5. **Docs**: platforms table in `README.md`.
+
+`PlatformTableTests` checks that `LoadLibrary`, `nativeResourceDirs`, `check-release-natives.sh` and the README list
+the same platforms, with the same directories and extensions: run it after updating all of them.
 
 On the new platform's CI runner, `NativeLibraryArchitectureTests` checks that the bundled library matches the JVM
 architecture, and the release check catches missing or mislabeled artifacts.

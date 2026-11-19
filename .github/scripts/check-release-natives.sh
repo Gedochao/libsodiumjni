@@ -8,7 +8,8 @@
 
 set -euo pipefail
 
-# Platforms, one per line: classifier ; directory under META-INF/native ; shared library extension ;
+# Platforms, one per line (the same as LoadLibrary, the build and the README, checked by
+# PlatformTableTests): classifier ; directory under META-INF/native ; shared library extension ;
 #   static library extension ; extended regular expression that the `file -b` output of the shared
 #   library must match. The output format depends on the version of file (e.g. "PE32+ executable
 #   (DLL) (GUI) Aarch64, for MS Windows" with file 5.45, "PE32+ executable for MS Windows 6.02
