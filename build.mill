@@ -3,7 +3,7 @@ package build
 
 import build.project.settings.{GenerateHeaders, JniModule, JniPublishModule, JniResourcesModule}
 import build.project.publish.{computePublishVersion, gitCommitsSince, gitLastTag}
-import build.project.utils.{hostArch, isArmArchitecture}
+import build.project.utils.{checkSha256, hostArch, isArmArchitecture}
 
 import coursier.cache.ArchiveCache
 import coursier.util.Artifact
@@ -59,12 +59,19 @@ object libsodiumjni extends MavenModule with JniModule with JniPublishModule wit
   private def macosDeploymentTarget        = "11.0"
   private def macosDeploymentTargetOptions = Seq(s"-mmacosx-version-min=$macosDeploymentTarget")
 
-  // Used on all OSes: built from source on Linux / macOS, official MSVC build on Windows. The
-  // checksum of the source tarball matches both download.libsodium.org and the jedisct1/libsodium
-  // GitHub release asset. (1.0.21 doesn't compile with gcc on arm64.)
-  private def libsodiumVersion          = "1.0.22"
+  // Used on all OSes: built from source on Linux / macOS, official MSVC build on Windows. Both
+  // are the archives of the libsodiumVersion release, not the "-stable" ones, which get rebuilt
+  // from libsodium's stable branch (so their content and checksum change) from time to time.
+  // Their checksums were taken from archives whose minisign signatures were checked against
+  // libsodium's public key (RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3, see
+  // https://doc.libsodium.org/installation). The source tarball's matches the jedisct1/libsodium
+  // GitHub release asset too. (1.0.21 doesn't compile with gcc on arm64.)
+  private def libsodiumVersion     = "1.0.22"
+  private def libsodiumReleasesUrl = "https://download.libsodium.org/libsodium/releases"
   private def libsodiumSourceTarballSha256 =
     "adbdd8f16149e81ac6078a03aca6fc03b592b89ef7b5ed83841c086191be3349"
+  private def libsodiumMsvcZipSha256 =
+    "3e03a726fac4bc09cb61d8f29d658ef7a5eca0811de59082130414f7ca2e4279"
 
   /**
    * On Linux and macOS, libsodium built from source as a static library (with position independent
@@ -122,20 +129,30 @@ object libsodiumjni extends MavenModule with JniModule with JniPublishModule wit
       Some(PathRef(prefix))
   }
 
-  private def downloadLibSodiumSources(): os.Path =
-    val url   =
-      s"https://download.libsodium.org/libsodium/releases/libsodium-$libsodiumVersion.tar.gz"
+  /** Downloads url (or gets it from the coursier cache), and checks its SHA-256 */
+  private def downloadChecked(url: String, sha256: String): os.Path =
     val cache = coursier.cache.FileCache()
     val file  = cache.file(Artifact(url)).run.unsafeRun()(using cache.ec) match
       case Left(e)  => throw new Exception(e)
       case Right(f) => os.Path(f, BuildCtx.workspaceRoot)
-    val digest = java.security.MessageDigest.getInstance("SHA-256").digest(os.read.bytes(file))
-    val sha256 = digest.map(b => f"$b%02x").mkString
-    if sha256 != libsodiumSourceTarballSha256 then
-      sys.error(
-        s"Unexpected SHA-256 for $url ($file): $sha256, expected $libsodiumSourceTarballSha256"
-      )
+    checkSha256(file, url, sha256)
     file
+
+  private def libSodiumSourcesUrl = s"$libsodiumReleasesUrl/libsodium-$libsodiumVersion.tar.gz"
+  private def libSodiumMsvcZipUrl = s"$libsodiumReleasesUrl/libsodium-$libsodiumVersion-msvc.zip"
+
+  private def downloadLibSodiumSources(): os.Path =
+    downloadChecked(libSodiumSourcesUrl, libsodiumSourceTarballSha256)
+
+  /**
+   * Downloads the libsodium archives used on all OSes, and checks their SHA-256, whatever the OS
+   * this runs on (run on the CI, so that the Windows one gets checked outside of Windows too)
+   */
+  def checkLibsodiumDownloads() = Task.Command {
+    downloadLibSodiumSources()
+    downloadChecked(libSodiumMsvcZipUrl, libsodiumMsvcZipSha256)
+    println("libsodium downloads OK")
+  }
 
   def extraUnixCOptions = Task {
     val libSodium = unixLibSodium().getOrElse(sys.error("Unsupported OS"))
@@ -159,13 +176,11 @@ object libsodiumjni extends MavenModule with JniModule with JniPublishModule wit
   }
 
   private def windowsLibSodiumDistDir(): os.Path =
+    // checked before being extracted: ArchiveCache extracts the file downloadChecked checked (both
+    // use the default coursier cache)
+    downloadChecked(libSodiumMsvcZipUrl, libsodiumMsvcZipSha256)
     val archiveCache = ArchiveCache()
-    archiveCache.get(
-      Artifact(
-        "https://download.libsodium.org/libsodium/releases/" +
-          s"libsodium-$libsodiumVersion-stable-msvc.zip"
-      )
-    ).unsafeRun()(using archiveCache.cache.ec) match
+    archiveCache.get(Artifact(libSodiumMsvcZipUrl)).unsafeRun()(using archiveCache.cache.ec) match
       case Left(e)     => throw new Exception(e)
       case Right(dir0) => os.Path(dir0, BuildCtx.workspaceRoot)
 

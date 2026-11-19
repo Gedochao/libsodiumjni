@@ -43,7 +43,8 @@ Single Mill module, `libsodiumjni` (Java + C), with its tests in `libsodiumjni.t
 | `libsodiumjni/src/test/`                                   | Tests; `ChildJvm` runs scenarios in fresh JVMs                                           |
 | `build.mill`                                               | Module definition, how libsodium is obtained per OS, publishing                          |
 | `project/settings/package.mill`                            | Generic JNI build traits: C compilation / linking per OS, resources, per-classifier publishing |
-| `project/utils/package.mill`                               | Build architecture detection, classifier → `META-INF/native` directory mapping           |
+| `project/utils/package.mill`                               | Build architecture detection, classifier → `META-INF/native` directory mapping, checksums |
+| `project/utils/tests/package.mill`                         | Tests of the above, as Mill commands (`./mill -i 'project.utils.tests._'`)                |
 | `project/publish/package.mill`                             | Published version computation (from git tags)                                            |
 | `project/visualstudioutil/package.mill`                    | Visual Studio environment lookup (Windows)                                               |
 | `.github/scripts/check-release-natives.sh`                 | Checks a release has the native libraries of all platforms, for the right architecture  |
