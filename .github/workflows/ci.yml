@@ -111,6 +111,8 @@ jobs:
         with:
           name: artifacts-mac-aarch64
           path: artifacts/
+      - name: Test the native libraries check
+        run: .github/scripts/check-release-natives-test.sh
       - name: Check native libraries of the release
         run: |
           ./mill -i libsodiumjni.jar
